@@ -3,17 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>그래디언트와 방향도함수 시각화</title>
+  <title>이변수 함수 그래디언트 시각화</title>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     :root {
       --bg: #f6efe3;
-      --panel: rgba(255, 251, 244, 0.92);
+      --panel: rgba(255, 251, 244, 0.94);
       --ink: #1f2a30;
       --muted: #5b6670;
       --accent: #d4632f;
       --accent-2: #118ab2;
       --point: #c1121f;
+      --ok: #1d7f52;
+      --warn: #aa4b18;
       --edge: rgba(31, 42, 48, 0.12);
       --shadow: 0 18px 40px rgba(63, 46, 22, 0.12);
     }
@@ -35,7 +37,7 @@
 
     .page {
       display: grid;
-      grid-template-columns: 360px minmax(0, 1fr);
+      grid-template-columns: 390px minmax(0, 1fr);
       gap: 20px;
       padding: 20px;
       min-height: 100vh;
@@ -58,7 +60,7 @@
 
     h1 {
       margin: 0;
-      font-size: 1.7rem;
+      font-size: 1.72rem;
       line-height: 1.15;
     }
 
@@ -69,22 +71,43 @@
       font-size: 0.98rem;
     }
 
-    .formula {
-      font-size: 1.08rem;
-      padding: 12px 14px;
-      border-radius: 14px;
+    .formula-box,
+    .tip,
+    .status,
+    .info {
+      border-radius: 16px;
+      padding: 14px;
+      line-height: 1.6;
+    }
+
+    .formula-box {
       background: rgba(212, 99, 47, 0.08);
       border: 1px solid rgba(212, 99, 47, 0.14);
-      font-variant-numeric: tabular-nums;
     }
 
     .tip {
-      padding: 14px;
-      border-radius: 16px;
       background: rgba(17, 138, 178, 0.09);
       border: 1px solid rgba(17, 138, 178, 0.14);
-      line-height: 1.55;
-      color: var(--ink);
+    }
+
+    .status {
+      background: rgba(29, 127, 82, 0.08);
+      border: 1px solid rgba(29, 127, 82, 0.14);
+      color: var(--ok);
+      font-size: 0.95rem;
+    }
+
+    .status.error {
+      background: rgba(170, 75, 24, 0.08);
+      border-color: rgba(170, 75, 24, 0.14);
+      color: var(--warn);
+    }
+
+    .info {
+      white-space: pre-line;
+      background: rgba(255, 255, 255, 0.58);
+      border: 1px solid var(--edge);
+      font-variant-numeric: tabular-nums;
     }
 
     .control-group {
@@ -96,8 +119,20 @@
       font-weight: 600;
     }
 
+    input[type="text"],
     input[type="range"] {
       width: 100%;
+    }
+
+    input[type="text"] {
+      border: 1px solid var(--edge);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 1rem;
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    input[type="range"] {
       accent-color: var(--accent);
     }
 
@@ -106,6 +141,22 @@
       justify-content: space-between;
       color: var(--muted);
       font-variant-numeric: tabular-nums;
+    }
+
+    .examples {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      border: 1px solid rgba(17, 138, 178, 0.18);
+      background: rgba(17, 138, 178, 0.1);
+      color: var(--ink);
+      padding: 8px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.92rem;
     }
 
     .checkbox {
@@ -144,17 +195,6 @@
       background: rgba(17, 138, 178, 0.12);
       color: var(--ink);
       border: 1px solid rgba(17, 138, 178, 0.16);
-    }
-
-    .info {
-      white-space: pre-line;
-      line-height: 1.62;
-      color: var(--ink);
-      background: rgba(255, 255, 255, 0.58);
-      border: 1px solid var(--edge);
-      border-radius: 16px;
-      padding: 14px;
-      font-variant-numeric: tabular-nums;
     }
 
     .plots {
@@ -226,11 +266,13 @@
       border-radius: 50%;
     }
 
-    @media (max-width: 980px) {
+    @media (max-width: 1100px) {
       .page {
         grid-template-columns: 1fr;
       }
+    }
 
+    @media (max-width: 980px) {
       .plots {
         grid-template-rows: 420px 430px;
       }
@@ -241,18 +283,39 @@
   <main class="page">
     <section class="panel controls">
       <div>
-        <h1>그래디언트 방향 시각화</h1>
+        <h1>임의의 이변수 함수 시각화</h1>
         <p class="subtitle">
-          방향도함수와 그래디언트의 관계를 학생들이 직관적으로 이해할 수 있도록 만든 웹 GUI입니다.
+          함수식을 직접 입력하면 3차원 곡면, 등고선, 그래디언트 방향, 방향도함수를 함께 시각화합니다.
         </p>
       </div>
 
-      <div class="formula">f(x, y) = x²eʸ</div>
+      <div class="formula-box">
+        입력 예시: <strong>x^2*exp(y)</strong>, <strong>sin(x*y)</strong>, <strong>log(x^2+y^2+1)</strong>
+      </div>
+
+      <div class="control-group">
+        <label for="functionInput">함수 f(x,y) 입력</label>
+        <input id="functionInput" type="text" value="x^2*exp(y)" spellcheck="false">
+      </div>
+
+      <div class="examples">
+        <button class="chip" data-expression="x^2*exp(y)">x^2*exp(y)</button>
+        <button class="chip" data-expression="sin(x*y)">sin(x*y)</button>
+        <button class="chip" data-expression="x^2+y^2">x^2+y^2</button>
+        <button class="chip" data-expression="log(x^2+y^2+1)">log(x^2+y^2+1)</button>
+      </div>
+
+      <div class="button-row">
+        <button id="applyFunctionButton" class="primary">함수 적용</button>
+        <button id="resetButton" class="secondary">예시 상태로 되돌리기</button>
+      </div>
 
       <div class="tip">
         등고선 그래프에서 빈 곳을 클릭하면 점이 이동합니다.
         선택한 점 근처에서 드래그하면 임의 방향 <strong>u</strong>를 직접 정할 수 있습니다.
       </div>
+
+      <div id="statusBox" class="status">현재 함수가 정상적으로 적용되었습니다.</div>
 
       <div class="control-group">
         <label for="xSlider">선택한 점의 x 좌표</label>
@@ -282,10 +345,7 @@
         <span>u 를 자동으로 회전시키며 방향도함수 변화 애니메이션 보기</span>
       </label>
 
-      <div class="button-row">
-        <button id="gradientButton" class="primary">u 를 그래디언트 방향으로 맞추기</button>
-        <button id="resetButton" class="secondary">예시 상태로 되돌리기</button>
-      </div>
+      <button id="gradientButton" class="secondary">u 를 그래디언트 방향으로 맞추기</button>
 
       <div id="infoBox" class="info"></div>
     </section>
@@ -294,7 +354,7 @@
       <article class="panel plot-card">
         <div class="plot-title">3차원 곡면과 가장 가파른 상승 방향</div>
         <div class="plot-subtitle">
-          빨간 점은 선택한 점이고, 주황 화살표는 그 점에서의 그래디언트 방향입니다.
+          빨간 점은 선택한 점, 반투명 평면은 접평면입니다. 접평면 위의 주황 화살표가 가장 가파른 상승 방향입니다.
         </div>
         <div id="surfacePlot"></div>
       </article>
@@ -326,9 +386,13 @@
     const yValue = document.getElementById("yValue");
     const thetaValue = document.getElementById("thetaValue");
     const infoBox = document.getElementById("infoBox");
+    const statusBox = document.getElementById("statusBox");
     const gradientButton = document.getElementById("gradientButton");
     const resetButton = document.getElementById("resetButton");
+    const functionInput = document.getElementById("functionInput");
+    const applyFunctionButton = document.getElementById("applyFunctionButton");
     const contourCanvas = document.getElementById("contourCanvas");
+    const exampleButtons = Array.from(document.querySelectorAll(".chip"));
 
     const domain = {
       xMin: -3,
@@ -337,21 +401,20 @@
       yMax: 2
     };
 
+    const allowedNames = [
+      "abs", "acos", "asin", "atan", "ceil", "cos", "exp", "floor", "log", "max", "min",
+      "pow", "round", "sign", "sin", "sqrt", "tan", "pi", "e"
+    ];
+
     const state = {
+      expression: "x^2*exp(y)",
+      compiledFunction: null,
       draggingDirection: false,
       animationFrame: null,
       animationAngle: Number(thetaSlider.value),
-      pulse: 0
+      pulse: 0,
+      surfaceData: null
     };
-
-    function f(x, y) {
-      return x * x * Math.exp(y);
-    }
-
-    function gradF(x, y) {
-      const expY = Math.exp(y);
-      return [2 * x * expY, x * x * expY];
-    }
 
     function format(value, digits = 4) {
       return Number(value).toFixed(digits);
@@ -390,14 +453,97 @@
       return arr;
     }
 
-    function generateSurfaceData() {
-      const xs = linspace(domain.xMin, domain.xMax, 61);
-      const ys = linspace(domain.yMin, domain.yMax, 61);
-      const z = ys.map((y) => xs.map((x) => f(x, y)));
-      return { xs, ys, z };
+    function sanitizeExpression(expression) {
+      let sanitized = expression.trim().toLowerCase();
+      sanitized = sanitized.replace(/\s+/g, "");
+      sanitized = sanitized.replace(/\^/g, "**");
+      sanitized = sanitized.replace(/pi/g, "Math.PI");
+      sanitized = sanitized.replace(/\be\b/g, "Math.E");
+
+      for (const name of allowedNames) {
+        const pattern = new RegExp(`\\b${name}\\b`, "g");
+        const replacement = name === "pi" || name === "e" ? name : `Math.${name}`;
+        sanitized = sanitized.replace(pattern, replacement);
+      }
+
+      return sanitized;
     }
 
-    const surfaceData = generateSurfaceData();
+    function compileExpression(expression) {
+      const sanitized = sanitizeExpression(expression);
+
+      if (!sanitized) {
+        throw new Error("함수식을 입력해 주세요.");
+      }
+
+      if (/[^0-9a-z_+\-*/().,]/i.test(sanitized.replace(/Math\./g, ""))) {
+        throw new Error("영문 함수명과 숫자, 연산자만 사용할 수 있습니다.");
+      }
+
+      const fn = new Function("x", "y", `return ${sanitized};`);
+      const test = fn(1, 0.5);
+      if (!Number.isFinite(test)) {
+        throw new Error("예시 점에서 함수값이 유한하지 않습니다.");
+      }
+      return fn;
+    }
+
+    function evaluateFunction(x, y) {
+      const value = state.compiledFunction(x, y);
+      if (!Number.isFinite(value)) {
+        throw new Error("선택한 점에서 함수값이 정의되지 않습니다.");
+      }
+      return value;
+    }
+
+    function numericalGradient(x, y) {
+      const hx = 1e-4;
+      const hy = 1e-4;
+      const fx1 = evaluateFunction(x + hx, y);
+      const fx2 = evaluateFunction(x - hx, y);
+      const fy1 = evaluateFunction(x, y + hy);
+      const fy2 = evaluateFunction(x, y - hy);
+      return [(fx1 - fx2) / (2 * hx), (fy1 - fy2) / (2 * hy)];
+    }
+
+    function setStatus(message, isError = false) {
+      statusBox.textContent = message;
+      statusBox.classList.toggle("error", isError);
+    }
+
+    function buildSurfaceData() {
+      const xs = linspace(domain.xMin, domain.xMax, 61);
+      const ys = linspace(domain.yMin, domain.yMax, 61);
+      const z = [];
+
+      for (const y of ys) {
+        const row = [];
+        for (const x of xs) {
+          let value;
+          try {
+            value = evaluateFunction(x, y);
+          } catch (_error) {
+            value = NaN;
+          }
+          row.push(Number.isFinite(value) ? value : null);
+        }
+        z.push(row);
+      }
+
+      state.surfaceData = { xs, ys, z };
+    }
+
+    function applyCurrentFunction() {
+      try {
+        state.compiledFunction = compileExpression(functionInput.value);
+        state.expression = functionInput.value.trim();
+        buildSurfaceData();
+        setStatus(`함수 f(x,y) = ${state.expression} 가 정상적으로 적용되었습니다.`);
+        update();
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
 
     function updateLabels() {
       xValue.textContent = Number(xSlider.value).toFixed(2);
@@ -407,80 +553,178 @@
 
     function updateInfo(x, y, z, grad, u, directional) {
       const gradNorm = norm(grad);
+
       if (gradNorm < 1e-10) {
         infoBox.textContent =
+          `현재 함수: f(x,y) = ${state.expression}\n` +
           `선택한 점: (${format(x, 2)}, ${format(y, 2)})\n` +
           `함수값 f(x, y) = ${format(z)}\n` +
           `그래디언트 grad f = (0, 0)\n` +
-          `이 점에서는 모든 방향도함수가 0이므로, 가장 큰 방향이 하나로 정해지지 않습니다.`;
+          `이 점에서는 모든 방향도함수가 0에 가까워서 가장 큰 방향이 하나로 정해지지 않습니다.`;
         return;
       }
 
       const cosTheta = directional / gradNorm;
       infoBox.textContent =
+        `현재 함수: f(x,y) = ${state.expression}\n` +
         `선택한 점: (${format(x, 2)}, ${format(y, 2)})\n` +
         `함수값 f(x, y) = ${format(z)}\n` +
-        `그래디언트 grad f = (${format(grad[0])}, ${format(grad[1])})\n` +
+        `수치 그래디언트 grad f = (${format(grad[0])}, ${format(grad[1])})\n` +
         `|grad f| = ${format(gradNorm)}\n` +
         `임의 방향 u = (${format(u[0])}, ${format(u[1])})\n` +
         `방향도함수 D_u f = grad f · u = ${format(directional)}\n` +
         `D_u f = |grad f| cos(theta),  cos(theta) = ${format(cosTheta)}\n\n` +
-        `theta = 0 일 때 cos(theta)=1 이므로 방향도함수는 최대가 되고, 그 방향이 바로 그래디언트 방향입니다.`;
+        `3차원 그림의 반투명 접평면 위에서 여러 접선 방향을 비교해 보면, 가장 길게 상승하는 방향이 그래디언트 방향입니다.`;
+    }
+
+    function addLineTrace(traces, xs, ys, zs, color, width, dash = "solid") {
+      traces.push({
+        type: "scatter3d",
+        mode: "lines",
+        x: xs,
+        y: ys,
+        z: zs,
+        line: { color, width, dash },
+        hoverinfo: "skip",
+        showlegend: false
+      });
+    }
+
+    function buildTangentPlane(x, y, z, grad) {
+      const span = 0.45;
+      const xs = [x - span, x + span];
+      const ys = [y - span, y + span];
+      const planeZ = ys.map((yy) =>
+        xs.map((xx) => z + grad[0] * (xx - x) + grad[1] * (yy - y))
+      );
+
+      return {
+        type: "surface",
+        x: xs,
+        y: ys,
+        z: planeZ,
+        opacity: 0.34,
+        showscale: false,
+        colorscale: [
+          [0, "rgba(255,255,255,0.15)"],
+          [1, "rgba(240,140,70,0.65)"]
+        ],
+        hoverinfo: "skip",
+        contours: {
+          x: { show: false },
+          y: { show: false },
+          z: { show: false }
+        }
+      };
+    }
+
+    function buildTangentDirectionSamples(x, y, z, grad) {
+      const traces = [];
+      const gradNorm = norm(grad);
+      if (gradNorm < 1e-10) {
+        return traces;
+      }
+
+      for (let k = 0; k < 8; k += 1) {
+        const angle = (2 * Math.PI * k) / 8;
+        const dir = [Math.cos(angle), Math.sin(angle)];
+        const slope = grad[0] * dir[0] + grad[1] * dir[1];
+        const scale = 0.18 + 0.12 * Math.max(0, slope / gradNorm);
+        addLineTrace(
+          traces,
+          [x, x + scale * dir[0]],
+          [y, y + scale * dir[1]],
+          [z, z + scale * slope],
+          "rgba(120,120,120,0.72)",
+          4
+        );
+      }
+
+      return traces;
+    }
+
+    function buildDirectionalSlice(x, y, z, direction, color, dash = "solid") {
+      const traces = [];
+      const span = 0.55;
+      const steps = 20;
+      const xs = [];
+      const ys = [];
+      const zs = [];
+
+      for (let i = -steps; i <= steps; i += 1) {
+        const t = (span * i) / steps;
+        const xx = x + t * direction[0];
+        const yy = y + t * direction[1];
+        if (xx < domain.xMin || xx > domain.xMax || yy < domain.yMin || yy > domain.yMax) {
+          continue;
+        }
+        try {
+          xs.push(xx);
+          ys.push(yy);
+          zs.push(evaluateFunction(xx, yy));
+        } catch (_error) {
+          // Skip undefined points.
+        }
+      }
+
+      if (xs.length >= 2) {
+        addLineTrace(traces, xs, ys, zs, color, 6, dash);
+      }
+      return traces;
     }
 
     function updateSurfacePlot(x, y, z, grad, u) {
       const gradNorm = norm(grad);
-      const surfaceTrace = {
-        type: "surface",
-        x: surfaceData.xs,
-        y: surfaceData.ys,
-        z: surfaceData.z,
-        colorscale: "Viridis",
-        opacity: 0.92,
-        showscale: false
-      };
-
-      const pointTrace = {
+      const traces = [
+        {
+          type: "surface",
+          x: state.surfaceData.xs,
+          y: state.surfaceData.ys,
+          z: state.surfaceData.z,
+          colorscale: "Viridis",
+          opacity: 0.92,
+          showscale: false
+        }
+      ];
+      traces.push({
         type: "scatter3d",
         mode: "markers",
         x: [x],
         y: [y],
         z: [z],
-        marker: {
-          size: 6,
-          color: "#c1121f"
-        },
-        hoverinfo: "skip",
-        showlegend: false
-      };
-
-      const traces = [surfaceTrace, pointTrace];
-
-      const gx = x + 0.18 * grad[0];
-      const gy = y + 0.18 * grad[1];
-      const gz = z + 0.12 * gradNorm;
-      traces.push({
-        type: "scatter3d",
-        mode: "lines",
-        x: [x, gx],
-        y: [y, gy],
-        z: [z, gz],
-        line: { color: "#d4632f", width: 8 },
+        marker: { size: 6, color: "#c1121f" },
         hoverinfo: "skip",
         showlegend: false
       });
 
+      traces.push(buildTangentPlane(x, y, z, grad));
+      traces.push(...buildTangentDirectionSamples(x, y, z, grad));
+
+      const gradUnit = gradNorm > 1e-10 ? [grad[0] / gradNorm, grad[1] / gradNorm] : [1, 0];
+      traces.push(...buildDirectionalSlice(x, y, z, gradUnit, "#f28f3b"));
       if (showDirection.checked) {
-        traces.push({
-          type: "scatter3d",
-          mode: "lines",
-          x: [x, x + 0.45 * u[0]],
-          y: [y, y + 0.45 * u[1]],
-          z: [z, z + 0.08 * Math.max(gradNorm, 0.5)],
-          line: { color: "#118ab2", width: 7 },
-          hoverinfo: "skip",
-          showlegend: false
-        });
+        traces.push(...buildDirectionalSlice(x, y, z, u, "#118ab2", "dot"));
+      }
+
+      addLineTrace(
+        traces,
+        [x, x + 0.28 * gradUnit[0]],
+        [y, y + 0.28 * gradUnit[1]],
+        [z, z + 0.28 * Math.max(gradNorm, 0.3)],
+        "#d4632f",
+        9
+      );
+
+      if (showDirection.checked) {
+        const uSlope = grad[0] * u[0] + grad[1] * u[1];
+        addLineTrace(
+          traces,
+          [x, x + 0.28 * u[0]],
+          [y, y + 0.28 * u[1]],
+          [z, z + 0.28 * uSlope],
+          "#118ab2",
+          8
+        );
       }
 
       Plotly.react("surfacePlot", traces, {
@@ -491,10 +735,21 @@
           xaxis: { title: "x", range: [domain.xMin, domain.xMax] },
           yaxis: { title: "y", range: [domain.yMin, domain.yMax] },
           zaxis: { title: "f(x, y)" },
-          camera: {
-            eye: { x: 1.55, y: -1.7, z: 0.95 }
+          camera: { eye: { x: 1.55, y: -1.7, z: 0.95 } }
+        },
+        annotations: [
+          {
+            text: "접평면 위 회색 접선들과 비교하면 주황색 grad f 가 가장 가파릅니다.",
+            x: 0.02,
+            y: 0.98,
+            xref: "paper",
+            yref: "paper",
+            showarrow: false,
+            bgcolor: "rgba(255,255,255,0.72)",
+            bordercolor: "rgba(212,99,47,0.18)",
+            font: { size: 13, color: "#5b6670" }
           }
-        }
+        ]
       }, {
         displayModeBar: false,
         responsive: true
@@ -525,9 +780,10 @@
 
     function pointerToCanvasPosition(event) {
       const rect = contourCanvas.getBoundingClientRect();
-      const px = (event.clientX - rect.left) * window.devicePixelRatio;
-      const py = (event.clientY - rect.top) * window.devicePixelRatio;
-      return [px, py];
+      return [
+        (event.clientX - rect.left) * window.devicePixelRatio,
+        (event.clientY - rect.top) * window.devicePixelRatio
+      ];
     }
 
     function drawArrow(ctx, x1, y1, x2, y2, color, width) {
@@ -552,7 +808,7 @@
     }
 
     function contourColor(value, zMin, zMax) {
-      const t = (value - zMin) / (zMax - zMin);
+      const t = (value - zMin) / (zMax - zMin || 1);
       const stops = [
         [59, 82, 139],
         [33, 145, 140],
@@ -570,10 +826,8 @@
 
     function drawAngleSector(ctx, px, py, gradUnit, u, pulse) {
       const start = -Math.atan2(gradUnit[1], gradUnit[0]);
-      const end = -Math.atan2(u[1], u[0]);
       const radius = (44 + 8 * Math.sin(pulse)) * window.devicePixelRatio;
       const diff = angleBetween(gradUnit, u);
-
       ctx.beginPath();
       ctx.moveTo(px, py);
       ctx.fillStyle = "rgba(212, 99, 47, 0.15)";
@@ -593,17 +847,24 @@
       const ny = 68;
       const xs = linspace(domain.xMin, domain.xMax, nx);
       const ys = linspace(domain.yMin, domain.yMax, ny);
+      const values = [];
       let zMin = Infinity;
       let zMax = -Infinity;
-      const values = [];
 
       for (let j = 0; j < ny; j += 1) {
         const row = [];
         for (let i = 0; i < nx; i += 1) {
-          const z = f(xs[i], ys[j]);
-          row.push(z);
-          zMin = Math.min(zMin, z);
-          zMax = Math.max(zMax, z);
+          let value;
+          try {
+            value = evaluateFunction(xs[i], ys[j]);
+          } catch (_error) {
+            value = NaN;
+          }
+          row.push(value);
+          if (Number.isFinite(value)) {
+            zMin = Math.min(zMin, value);
+            zMax = Math.max(zMax, value);
+          }
         }
         values.push(row);
       }
@@ -613,7 +874,8 @@
 
       for (let j = 0; j < ny - 1; j += 1) {
         for (let i = 0; i < nx - 1; i += 1) {
-          ctx.fillStyle = contourColor(values[j][i], zMin, zMax);
+          const value = values[j][i];
+          ctx.fillStyle = Number.isFinite(value) ? contourColor(value, zMin, zMax) : "rgba(200,200,200,0.28)";
           ctx.fillRect(i * cellW, height - (j + 1) * cellH, cellW + 1, cellH + 1);
         }
       }
@@ -622,17 +884,22 @@
       ctx.lineWidth = 1 * window.devicePixelRatio;
       for (let level = 0.1; level < 1; level += 0.1) {
         ctx.beginPath();
+        const target = zMin + level * (zMax - zMin);
+        let started = false;
         for (let j = 0; j < ny; j += 1) {
           for (let i = 0; i < nx - 1; i += 1) {
             const a = values[j][i];
             const b = values[j][i + 1];
-            const target = zMin + level * (zMax - zMin);
-            if ((a - target) * (b - target) <= 0 && a !== b) {
+            if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) {
+              continue;
+            }
+            if ((a - target) * (b - target) <= 0) {
               const t = (target - a) / (b - a);
               const px = (i + t) * cellW;
               const py = height - j * cellH;
-              if (i === 0) {
+              if (!started) {
                 ctx.moveTo(px, py);
+                started = true;
               } else {
                 ctx.lineTo(px, py);
               }
@@ -685,9 +952,7 @@
     }
 
     function updateDirectionFromCanvas(px, py) {
-      const x = Number(xSlider.value);
-      const y = Number(ySlider.value);
-      const [cx, cy] = worldToCanvas(x, y);
+      const [cx, cy] = worldToCanvas(Number(xSlider.value), Number(ySlider.value));
       const dx = px - cx;
       const dy = cy - py;
       if (Math.hypot(dx, dy) < 6 * window.devicePixelRatio) {
@@ -699,16 +964,20 @@
     function update() {
       updateLabels();
 
-      const x = Number(xSlider.value);
-      const y = Number(ySlider.value);
-      const z = f(x, y);
-      const grad = gradF(x, y);
-      const u = unitDirection(Number(thetaSlider.value));
-      const directional = grad[0] * u[0] + grad[1] * u[1];
+      try {
+        const x = Number(xSlider.value);
+        const y = Number(ySlider.value);
+        const z = evaluateFunction(x, y);
+        const grad = numericalGradient(x, y);
+        const u = unitDirection(Number(thetaSlider.value));
+        const directional = grad[0] * u[0] + grad[1] * u[1];
 
-      updateInfo(x, y, z, grad, u, directional);
-      updateSurfacePlot(x, y, z, grad, u);
-      drawContourPlot(x, y, grad, u);
+        updateInfo(x, y, z, grad, u, directional);
+        updateSurfacePlot(x, y, z, grad, u);
+        drawContourPlot(x, y, grad, u);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
     }
 
     function stopAnimation() {
@@ -737,18 +1006,35 @@
     }
 
     gradientButton.addEventListener("click", () => {
-      const x = Number(xSlider.value);
-      const y = Number(ySlider.value);
-      const grad = gradF(x, y);
-      const gradNorm = norm(grad);
-      if (gradNorm > 1e-10) {
-        thetaSlider.value = Math.round(Math.atan2(grad[1], grad[0]) * 180 / Math.PI);
-        state.animationAngle = Number(thetaSlider.value);
-        update();
+      try {
+        const grad = numericalGradient(Number(xSlider.value), Number(ySlider.value));
+        const gradNorm = norm(grad);
+        if (gradNorm > 1e-10) {
+          thetaSlider.value = Math.round(Math.atan2(grad[1], grad[0]) * 180 / Math.PI);
+          state.animationAngle = Number(thetaSlider.value);
+          update();
+        }
+      } catch (error) {
+        setStatus(error.message, true);
       }
     });
 
+    applyFunctionButton.addEventListener("click", applyCurrentFunction);
+    functionInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        applyCurrentFunction();
+      }
+    });
+
+    exampleButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        functionInput.value = button.dataset.expression;
+        applyCurrentFunction();
+      });
+    });
+
     resetButton.addEventListener("click", () => {
+      functionInput.value = "x^2*exp(y)";
       xSlider.value = 1;
       ySlider.value = 0.5;
       thetaSlider.value = 25;
@@ -756,7 +1042,7 @@
       animateDirection.checked = false;
       state.pulse = 0;
       stopAnimation();
-      update();
+      applyCurrentFunction();
     });
 
     [xSlider, ySlider, thetaSlider, showDirection].forEach((el) => {
@@ -817,7 +1103,8 @@
     });
 
     window.addEventListener("resize", update);
-    update();
+
+    applyCurrentFunction();
   </script>
 </body>
 </html>

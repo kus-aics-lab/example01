@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>그래디언트와 방향도함수 시각화</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6efe3;
+      --panel: rgba(255, 251, 244, 0.92);
+      --ink: #1f2a30;
+      --muted: #5b6670;
+      --accent: #d4632f;
+      --accent-2: #118ab2;
+      --point: #c1121f;
+      --edge: rgba(31, 42, 48, 0.12);
+      --shadow: 0 18px 40px rgba(63, 46, 22, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Noto Sans KR", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(212, 99, 47, 0.18), transparent 28%),
+        radial-gradient(circle at right center, rgba(17, 138, 178, 0.12), transparent 30%),
+        linear-gradient(180deg, #faf5ec, var(--bg));
+      min-height: 100vh;
+    }
+
+    .page {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 20px;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--edge);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .controls {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.7rem;
+      line-height: 1.15;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 0.98rem;
+    }
+
+    .formula {
+      font-size: 1.08rem;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(212, 99, 47, 0.08);
+      border: 1px solid rgba(212, 99, 47, 0.14);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tip {
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(17, 138, 178, 0.09);
+      border: 1px solid rgba(17, 138, 178, 0.14);
+      line-height: 1.55;
+      color: var(--ink);
+    }
+
+    .control-group {
+      display: grid;
+      gap: 8px;
+    }
+
+    label {
+      font-weight: 600;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .value-row {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .checkbox {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      line-height: 1.45;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 0.96rem;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      opacity: 0.96;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .secondary {
+      background: rgba(17, 138, 178, 0.12);
+      color: var(--ink);
+      border: 1px solid rgba(17, 138, 178, 0.16);
+    }
+
+    .info {
+      white-space: pre-line;
+      line-height: 1.62;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.58);
+      border: 1px solid var(--edge);
+      border-radius: 16px;
+      padding: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .plots {
+      display: grid;
+      grid-template-rows: minmax(390px, 1fr) minmax(360px, 0.95fr);
+      gap: 20px;
+      min-width: 0;
+    }
+
+    .plot-card {
+      padding: 10px;
+      overflow: hidden;
+    }
+
+    .plot-title {
+      padding: 10px 14px 0;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .plot-subtitle {
+      padding: 4px 14px 10px;
+      color: var(--muted);
+      font-size: 0.94rem;
+      line-height: 1.45;
+    }
+
+    #surfacePlot {
+      width: 100%;
+      height: calc(100% - 10px);
+      min-height: 340px;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      height: calc(100% - 10px);
+      min-height: 330px;
+      padding: 8px 12px 14px;
+    }
+
+    #contourCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.75), rgba(248, 242, 231, 0.75));
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 0 14px 10px;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+    }
+
+    @media (max-width: 980px) {
+      .page {
+        grid-template-columns: 1fr;
+      }
+
+      .plots {
+        grid-template-rows: 420px 430px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="panel controls">
+      <div>
+        <h1>그래디언트 방향 시각화</h1>
+        <p class="subtitle">
+          방향도함수와 그래디언트의 관계를 학생들이 직관적으로 이해할 수 있도록 만든 웹 GUI입니다.
+        </p>
+      </div>
+
+      <div class="formula">f(x, y) = x²eʸ</div>
+
+      <div class="tip">
+        등고선 그래프에서 빈 곳을 클릭하면 점이 이동합니다.
+        선택한 점 근처에서 드래그하면 임의 방향 <strong>u</strong>를 직접 정할 수 있습니다.
+      </div>
+
+      <div class="control-group">
+        <label for="xSlider">선택한 점의 x 좌표</label>
+        <input id="xSlider" type="range" min="-3" max="3" step="0.01" value="1">
+        <div class="value-row"><span>x</span><span id="xValue">1.00</span></div>
+      </div>
+
+      <div class="control-group">
+        <label for="ySlider">선택한 점의 y 좌표</label>
+        <input id="ySlider" type="range" min="-2" max="2" step="0.01" value="0.5">
+        <div class="value-row"><span>y</span><span id="yValue">0.50</span></div>
+      </div>
+
+      <div class="control-group">
+        <label for="thetaSlider">임의 방향 u 의 각도</label>
+        <input id="thetaSlider" type="range" min="-180" max="180" step="1" value="25">
+        <div class="value-row"><span>각도</span><span id="thetaValue">25°</span></div>
+      </div>
+
+      <label class="checkbox">
+        <input id="showDirection" type="checkbox" checked>
+        <span>임의 방향 u 함께 표시</span>
+      </label>
+
+      <label class="checkbox">
+        <input id="animateDirection" type="checkbox">
+        <span>u 를 자동으로 회전시키며 방향도함수 변화 애니메이션 보기</span>
+      </label>
+
+      <div class="button-row">
+        <button id="gradientButton" class="primary">u 를 그래디언트 방향으로 맞추기</button>
+        <button id="resetButton" class="secondary">예시 상태로 되돌리기</button>
+      </div>
+
+      <div id="infoBox" class="info"></div>
+    </section>
+
+    <section class="plots">
+      <article class="panel plot-card">
+        <div class="plot-title">3차원 곡면과 가장 가파른 상승 방향</div>
+        <div class="plot-subtitle">
+          빨간 점은 선택한 점이고, 주황 화살표는 그 점에서의 그래디언트 방향입니다.
+        </div>
+        <div id="surfacePlot"></div>
+      </article>
+
+      <article class="panel plot-card">
+        <div class="plot-title">등고선 위에서 보는 방향도함수</div>
+        <div class="plot-subtitle">
+          클릭으로 점을 고르고, 선택한 점 근처에서 드래그하여 임의 방향 u 를 설정하세요.
+        </div>
+        <div class="legend">
+          <span><i class="swatch" style="background:#d4632f"></i>그래디언트 방향</span>
+          <span><i class="swatch" style="background:#118ab2"></i>임의 방향 u</span>
+          <span><i class="swatch" style="background:#c1121f"></i>선택한 점</span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="contourCanvas"></canvas>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const xSlider = document.getElementById("xSlider");
+    const ySlider = document.getElementById("ySlider");
+    const thetaSlider = document.getElementById("thetaSlider");
+    const showDirection = document.getElementById("showDirection");
+    const animateDirection = document.getElementById("animateDirection");
+    const xValue = document.getElementById("xValue");
+    const yValue = document.getElementById("yValue");
+    const thetaValue = document.getElementById("thetaValue");
+    const infoBox = document.getElementById("infoBox");
+    const gradientButton = document.getElementById("gradientButton");
+    const resetButton = document.getElementById("resetButton");
+    const contourCanvas = document.getElementById("contourCanvas");
+
+    const domain = {
+      xMin: -3,
+      xMax: 3,
+      yMin: -2,
+      yMax: 2
+    };
+
+    const state = {
+      draggingDirection: false,
+      animationFrame: null,
+      animationAngle: Number(thetaSlider.value),
+      pulse: 0
+    };
+
+    function f(x, y) {
+      return x * x * Math.exp(y);
+    }
+
+    function gradF(x, y) {
+      const expY = Math.exp(y);
+      return [2 * x * expY, x * x * expY];
+    }
+
+    function format(value, digits = 4) {
+      return Number(value).toFixed(digits);
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function unitDirection(thetaDeg) {
+      const theta = thetaDeg * Math.PI / 180;
+      return [Math.cos(theta), Math.sin(theta)];
+    }
+
+    function norm(v) {
+      return Math.hypot(v[0], v[1]);
+    }
+
+    function normalizeAngle(thetaDeg) {
+      let angle = thetaDeg;
+      while (angle > 180) angle -= 360;
+      while (angle < -180) angle += 360;
+      return angle;
+    }
+
+    function angleBetween(a, b) {
+      const diff = Math.atan2(b[1], b[0]) - Math.atan2(a[1], a[0]);
+      return Math.atan2(Math.sin(diff), Math.cos(diff));
+    }
+
+    function linspace(start, end, count) {
+      const arr = [];
+      for (let i = 0; i < count; i += 1) {
+        arr.push(start + (end - start) * i / (count - 1));
+      }
+      return arr;
+    }
+
+    function generateSurfaceData() {
+      const xs = linspace(domain.xMin, domain.xMax, 61);
+      const ys = linspace(domain.yMin, domain.yMax, 61);
+      const z = ys.map((y) => xs.map((x) => f(x, y)));
+      return { xs, ys, z };
+    }
+
+    const surfaceData = generateSurfaceData();
+
+    function updateLabels() {
+      xValue.textContent = Number(xSlider.value).toFixed(2);
+      yValue.textContent = Number(ySlider.value).toFixed(2);
+      thetaValue.textContent = `${thetaSlider.value}°`;
+    }
+
+    function updateInfo(x, y, z, grad, u, directional) {
+      const gradNorm = norm(grad);
+      if (gradNorm < 1e-10) {
+        infoBox.textContent =
+          `선택한 점: (${format(x, 2)}, ${format(y, 2)})\n` +
+          `함수값 f(x, y) = ${format(z)}\n` +
+          `그래디언트 grad f = (0, 0)\n` +
+          `이 점에서는 모든 방향도함수가 0이므로, 가장 큰 방향이 하나로 정해지지 않습니다.`;
+        return;
+      }
+
+      const cosTheta = directional / gradNorm;
+      infoBox.textContent =
+        `선택한 점: (${format(x, 2)}, ${format(y, 2)})\n` +
+        `함수값 f(x, y) = ${format(z)}\n` +
+        `그래디언트 grad f = (${format(grad[0])}, ${format(grad[1])})\n` +
+        `|grad f| = ${format(gradNorm)}\n` +
+        `임의 방향 u = (${format(u[0])}, ${format(u[1])})\n` +
+        `방향도함수 D_u f = grad f · u = ${format(directional)}\n` +
+        `D_u f = |grad f| cos(theta),  cos(theta) = ${format(cosTheta)}\n\n` +
+        `theta = 0 일 때 cos(theta)=1 이므로 방향도함수는 최대가 되고, 그 방향이 바로 그래디언트 방향입니다.`;
+    }
+
+    function updateSurfacePlot(x, y, z, grad, u) {
+      const gradNorm = norm(grad);
+      const surfaceTrace = {
+        type: "surface",
+        x: surfaceData.xs,
+        y: surfaceData.ys,
+        z: surfaceData.z,
+        colorscale: "Viridis",
+        opacity: 0.92,
+        showscale: false
+      };
+
+      const pointTrace = {
+        type: "scatter3d",
+        mode: "markers",
+        x: [x],
+        y: [y],
+        z: [z],
+        marker: {
+          size: 6,
+          color: "#c1121f"
+        },
+        hoverinfo: "skip",
+        showlegend: false
+      };
+
+      const traces = [surfaceTrace, pointTrace];
+
+      const gx = x + 0.18 * grad[0];
+      const gy = y + 0.18 * grad[1];
+      const gz = z + 0.12 * gradNorm;
+      traces.push({
+        type: "scatter3d",
+        mode: "lines",
+        x: [x, gx],
+        y: [y, gy],
+        z: [z, gz],
+        line: { color: "#d4632f", width: 8 },
+        hoverinfo: "skip",
+        showlegend: false
+      });
+
+      if (showDirection.checked) {
+        traces.push({
+          type: "scatter3d",
+          mode: "lines",
+          x: [x, x + 0.45 * u[0]],
+          y: [y, y + 0.45 * u[1]],
+          z: [z, z + 0.08 * Math.max(gradNorm, 0.5)],
+          line: { color: "#118ab2", width: 7 },
+          hoverinfo: "skip",
+          showlegend: false
+        });
+      }
+
+      Plotly.react("surfacePlot", traces, {
+        margin: { l: 0, r: 0, t: 4, b: 0 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        scene: {
+          xaxis: { title: "x", range: [domain.xMin, domain.xMax] },
+          yaxis: { title: "y", range: [domain.yMin, domain.yMax] },
+          zaxis: { title: "f(x, y)" },
+          camera: {
+            eye: { x: 1.55, y: -1.7, z: 0.95 }
+          }
+        }
+      }, {
+        displayModeBar: false,
+        responsive: true
+      });
+    }
+
+    function resizeCanvas() {
+      const rect = contourCanvas.getBoundingClientRect();
+      contourCanvas.width = rect.width * window.devicePixelRatio;
+      contourCanvas.height = rect.height * window.devicePixelRatio;
+    }
+
+    function worldToCanvas(x, y) {
+      const width = contourCanvas.width;
+      const height = contourCanvas.height;
+      const px = ((x - domain.xMin) / (domain.xMax - domain.xMin)) * width;
+      const py = height - ((y - domain.yMin) / (domain.yMax - domain.yMin)) * height;
+      return [px, py];
+    }
+
+    function canvasToWorld(px, py) {
+      const width = contourCanvas.width;
+      const height = contourCanvas.height;
+      const x = domain.xMin + (px / width) * (domain.xMax - domain.xMin);
+      const y = domain.yMin + ((height - py) / height) * (domain.yMax - domain.yMin);
+      return [x, y];
+    }
+
+    function pointerToCanvasPosition(event) {
+      const rect = contourCanvas.getBoundingClientRect();
+      const px = (event.clientX - rect.left) * window.devicePixelRatio;
+      const py = (event.clientY - rect.top) * window.devicePixelRatio;
+      return [px, py];
+    }
+
+    function drawArrow(ctx, x1, y1, x2, y2, color, width) {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      const head = 18 * window.devicePixelRatio;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - head * Math.cos(angle - Math.PI / 6), y2 - head * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(x2 - head * Math.cos(angle + Math.PI / 6), y2 - head * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function contourColor(value, zMin, zMax) {
+      const t = (value - zMin) / (zMax - zMin);
+      const stops = [
+        [59, 82, 139],
+        [33, 145, 140],
+        [94, 201, 98],
+        [253, 231, 37]
+      ];
+      const scaled = Math.max(0, Math.min(0.999, t)) * (stops.length - 1);
+      const i = Math.floor(scaled);
+      const frac = scaled - i;
+      const c1 = stops[i];
+      const c2 = stops[Math.min(i + 1, stops.length - 1)];
+      const c = c1.map((v, idx) => Math.round(v + (c2[idx] - v) * frac));
+      return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+    }
+
+    function drawAngleSector(ctx, px, py, gradUnit, u, pulse) {
+      const start = -Math.atan2(gradUnit[1], gradUnit[0]);
+      const end = -Math.atan2(u[1], u[0]);
+      const radius = (44 + 8 * Math.sin(pulse)) * window.devicePixelRatio;
+      const diff = angleBetween(gradUnit, u);
+
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.fillStyle = "rgba(212, 99, 47, 0.15)";
+      ctx.arc(px, py, radius, start, start - diff, diff > 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawContourPlot(x, y, grad, u) {
+      resizeCanvas();
+      const ctx = contourCanvas.getContext("2d");
+      const width = contourCanvas.width;
+      const height = contourCanvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      const nx = 88;
+      const ny = 68;
+      const xs = linspace(domain.xMin, domain.xMax, nx);
+      const ys = linspace(domain.yMin, domain.yMax, ny);
+      let zMin = Infinity;
+      let zMax = -Infinity;
+      const values = [];
+
+      for (let j = 0; j < ny; j += 1) {
+        const row = [];
+        for (let i = 0; i < nx; i += 1) {
+          const z = f(xs[i], ys[j]);
+          row.push(z);
+          zMin = Math.min(zMin, z);
+          zMax = Math.max(zMax, z);
+        }
+        values.push(row);
+      }
+
+      const cellW = width / (nx - 1);
+      const cellH = height / (ny - 1);
+
+      for (let j = 0; j < ny - 1; j += 1) {
+        for (let i = 0; i < nx - 1; i += 1) {
+          ctx.fillStyle = contourColor(values[j][i], zMin, zMax);
+          ctx.fillRect(i * cellW, height - (j + 1) * cellH, cellW + 1, cellH + 1);
+        }
+      }
+
+      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      ctx.lineWidth = 1 * window.devicePixelRatio;
+      for (let level = 0.1; level < 1; level += 0.1) {
+        ctx.beginPath();
+        for (let j = 0; j < ny; j += 1) {
+          for (let i = 0; i < nx - 1; i += 1) {
+            const a = values[j][i];
+            const b = values[j][i + 1];
+            const target = zMin + level * (zMax - zMin);
+            if ((a - target) * (b - target) <= 0 && a !== b) {
+              const t = (target - a) / (b - a);
+              const px = (i + t) * cellW;
+              const py = height - j * cellH;
+              if (i === 0) {
+                ctx.moveTo(px, py);
+              } else {
+                ctx.lineTo(px, py);
+              }
+            }
+          }
+        }
+        ctx.stroke();
+      }
+
+      const [px, py] = worldToCanvas(x, y);
+      const gradNorm = norm(grad);
+      const arrowLength = (74 + 6 * Math.sin(state.pulse)) * window.devicePixelRatio;
+
+      if (gradNorm > 1e-10) {
+        const gradUnit = [grad[0] / gradNorm, grad[1] / gradNorm];
+        drawAngleSector(ctx, px, py, gradUnit, u, state.pulse);
+        drawArrow(ctx, px, py, px + gradUnit[0] * arrowLength, py - gradUnit[1] * arrowLength, "#d4632f", 5 * window.devicePixelRatio);
+        ctx.fillStyle = "#d4632f";
+        ctx.font = `${15 * window.devicePixelRatio}px Segoe UI`;
+        ctx.fillText("grad f", px + gradUnit[0] * arrowLength + 8, py - gradUnit[1] * arrowLength);
+      }
+
+      if (showDirection.checked) {
+        drawArrow(ctx, px, py, px + u[0] * arrowLength, py - u[1] * arrowLength, "#118ab2", 4 * window.devicePixelRatio);
+        ctx.fillStyle = "#118ab2";
+        ctx.font = `${15 * window.devicePixelRatio}px Segoe UI`;
+        ctx.fillText("u", px + u[0] * arrowLength + 8, py - u[1] * arrowLength);
+      }
+
+      ctx.beginPath();
+      ctx.fillStyle = "#c1121f";
+      ctx.arc(px, py, 7 * window.devicePixelRatio, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(193, 18, 31, 0.25)";
+      ctx.lineWidth = 14 * window.devicePixelRatio;
+      ctx.arc(px, py, 17 * window.devicePixelRatio, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(31,42,48,0.86)";
+      ctx.font = `${14 * window.devicePixelRatio}px Segoe UI`;
+      ctx.fillText(`(${format(x, 2)}, ${format(y, 2)})`, px + 10, py - 10);
+    }
+
+    function updateFromCanvasPoint(px, py) {
+      const [x, y] = canvasToWorld(px, py);
+      xSlider.value = clamp(x, domain.xMin, domain.xMax).toFixed(2);
+      ySlider.value = clamp(y, domain.yMin, domain.yMax).toFixed(2);
+    }
+
+    function updateDirectionFromCanvas(px, py) {
+      const x = Number(xSlider.value);
+      const y = Number(ySlider.value);
+      const [cx, cy] = worldToCanvas(x, y);
+      const dx = px - cx;
+      const dy = cy - py;
+      if (Math.hypot(dx, dy) < 6 * window.devicePixelRatio) {
+        return;
+      }
+      thetaSlider.value = Math.round(Math.atan2(dy, dx) * 180 / Math.PI);
+    }
+
+    function update() {
+      updateLabels();
+
+      const x = Number(xSlider.value);
+      const y = Number(ySlider.value);
+      const z = f(x, y);
+      const grad = gradF(x, y);
+      const u = unitDirection(Number(thetaSlider.value));
+      const directional = grad[0] * u[0] + grad[1] * u[1];
+
+      updateInfo(x, y, z, grad, u, directional);
+      updateSurfacePlot(x, y, z, grad, u);
+      drawContourPlot(x, y, grad, u);
+    }
+
+    function stopAnimation() {
+      if (state.animationFrame !== null) {
+        cancelAnimationFrame(state.animationFrame);
+        state.animationFrame = null;
+      }
+    }
+
+    function animate() {
+      state.animationAngle = normalizeAngle(state.animationAngle + 0.7);
+      thetaSlider.value = Math.round(state.animationAngle);
+      state.pulse += 0.08;
+      update();
+      state.animationFrame = requestAnimationFrame(animate);
+    }
+
+    function syncAnimationState() {
+      if (animateDirection.checked) {
+        state.animationAngle = Number(thetaSlider.value);
+        stopAnimation();
+        animate();
+      } else {
+        stopAnimation();
+      }
+    }
+
+    gradientButton.addEventListener("click", () => {
+      const x = Number(xSlider.value);
+      const y = Number(ySlider.value);
+      const grad = gradF(x, y);
+      const gradNorm = norm(grad);
+      if (gradNorm > 1e-10) {
+        thetaSlider.value = Math.round(Math.atan2(grad[1], grad[0]) * 180 / Math.PI);
+        state.animationAngle = Number(thetaSlider.value);
+        update();
+      }
+    });
+
+    resetButton.addEventListener("click", () => {
+      xSlider.value = 1;
+      ySlider.value = 0.5;
+      thetaSlider.value = 25;
+      showDirection.checked = true;
+      animateDirection.checked = false;
+      state.pulse = 0;
+      stopAnimation();
+      update();
+    });
+
+    [xSlider, ySlider, thetaSlider, showDirection].forEach((el) => {
+      el.addEventListener("input", () => {
+        if (!animateDirection.checked) {
+          state.animationAngle = Number(thetaSlider.value);
+        }
+        update();
+      });
+      el.addEventListener("change", update);
+    });
+
+    animateDirection.addEventListener("change", syncAnimationState);
+
+    contourCanvas.addEventListener("pointerdown", (event) => {
+      const [px, py] = pointerToCanvasPosition(event);
+      const [cx, cy] = worldToCanvas(Number(xSlider.value), Number(ySlider.value));
+      const nearPoint = Math.hypot(px - cx, py - cy) < 26 * window.devicePixelRatio;
+
+      if (nearPoint) {
+        state.draggingDirection = true;
+        updateDirectionFromCanvas(px, py);
+      } else {
+        updateFromCanvasPoint(px, py);
+      }
+
+      if (!animateDirection.checked) {
+        state.animationAngle = Number(thetaSlider.value);
+      }
+
+      contourCanvas.setPointerCapture(event.pointerId);
+      update();
+    });
+
+    contourCanvas.addEventListener("pointermove", (event) => {
+      if (!state.draggingDirection) {
+        return;
+      }
+      const [px, py] = pointerToCanvasPosition(event);
+      updateDirectionFromCanvas(px, py);
+      if (!animateDirection.checked) {
+        state.animationAngle = Number(thetaSlider.value);
+      }
+      update();
+    });
+
+    function finishPointer(event) {
+      state.draggingDirection = false;
+      if (event && contourCanvas.hasPointerCapture(event.pointerId)) {
+        contourCanvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    contourCanvas.addEventListener("pointerup", finishPointer);
+    contourCanvas.addEventListener("pointercancel", finishPointer);
+    contourCanvas.addEventListener("pointerleave", () => {
+      state.draggingDirection = false;
+    });
+
+    window.addEventListener("resize", update);
+    update();
+  </script>
+</body>
+</html>
